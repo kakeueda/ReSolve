@@ -31,7 +31,11 @@ namespace ReSolve
     GSVariant  getVariant();
     real_type* getL(); // only for low synch, returns null ptr otherwise
 
-    int  setup(index_type n, index_type restart);
+    int setup(index_type n, index_type restart);
+    /**
+     * @return 0 on successful expansion, 1 when the next vector has zero norm.
+     *         Arnoldi-based callers may interpret the latter as happy breakdown.
+     */
     int  orthogonalize(index_type n, vector_type* V, real_type* H, index_type i);
     bool isSetupComplete();
 

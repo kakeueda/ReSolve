@@ -32,7 +32,8 @@ void printHelpInfo()
   std::cout << "Optional features:\n";
   std::cout << "\t-b <cpu|cuda|hip> \tSelects hardware backend.\n";
   std::cout << "\t-h \tPrints this message.\n";
-  std::cout << "\t-i <iter method> \tIterative method: randgmres or fgmres (default 'randgmres').\n";
+  std::cout << "\t-i <iter method> \tIterative method: randgmres, fgmres, or gcrodr "
+            << "(default 'randgmres').\n";
   std::cout << "\t-g <gs method> \tGram-Schmidt method: cgs1, cgs2, or mgs (default 'cgs2').\n";
   std::cout << "\t-n <yes|no> \tEnable numeric boost on CUDA/HIP (default 'yes' on CUDA, 'no' on HIP).\n";
   std::cout << "\t-t <boost tolerance> \tNumeric boost tolerance for CUDA/HIP (default '1e-6').\n";
@@ -265,7 +266,10 @@ int sysGmres(int argc, char* argv[])
   {
     solver.setSketchingMethod(sketch);
   }
-  solver.getIterativeSolver().setCliParam("flexible", flexible);
+  if (method != "gcrodr")
+  {
+    solver.getIterativeSolver().setCliParam("flexible", flexible);
+  }
   solver.getIterativeSolver().setCliParam("restart", "200");
 
   // Set up the preconditioner
@@ -317,7 +321,7 @@ void processInputs(std::string& method, std::string& gs, std::string& sketch, st
     }
   }
 
-  if ((method != "randgmres") && (method != "fgmres"))
+  if ((method != "randgmres") && (method != "fgmres") && (method != "gcrodr"))
   {
     std::cout << "Iterative method " << method << " not recognized.\n";
     std::cout << "Setting iterative solver method to the default (RANDGMRES).\n\n";
@@ -343,6 +347,13 @@ void processInputs(std::string& method, std::string& gs, std::string& sketch, st
   {
     std::cout << "Preconditioning side " << side << " not recognized.\n";
     std::cout << "Setting preconditioning side to the default (right).\n\n";
+    side = "right";
+  }
+  if (method == "gcrodr" && side != "right")
+  {
+    std::cout << "GCRO-DR supports right preconditioning only.\n";
+    std::cout << "Setting preconditioning side to right.\n\n";
+    side = "right";
   }
 }
 

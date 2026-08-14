@@ -17,6 +17,9 @@ target_link_libraries(rand_gmres_test.exe PRIVATE ReSolve)
 add_executable(sys_rand_gmres_test.exe testSysGmres.cpp)
 target_link_libraries(sys_rand_gmres_test.exe PRIVATE ReSolve)
 
+add_executable(gcrodr_matrix_test.exe testGCRODR.cpp)
+target_link_libraries(gcrodr_matrix_test.exe PRIVATE ReSolve)
+
 if(RESOLVE_USE_KLU)
   # Build KLU+KLU test
   add_executable(klu_klu_test.exe testKlu.cpp)
@@ -54,6 +57,7 @@ endif()
 set(installable_tests version.exe)
 list(APPEND installable_tests rand_gmres_test.exe)
 list(APPEND installable_tests sys_rand_gmres_test.exe)
+list(APPEND installable_tests gcrodr_matrix_test.exe)
 
 if(RESOLVE_USE_KLU)
   list(APPEND installable_tests klu_klu_test.exe)
@@ -85,6 +89,29 @@ set(asym_matrix_path /data/A_asymmetric)
 set(asym_rhs_path /data/b_asymmetric)
 
 add_test(NAME version COMMAND $<TARGET_FILE:version.exe>)
+
+foreach(matrix_case spd symmetric asymmetric)
+  add_test(
+    NAME gcrodr_cpu_${matrix_case}_test
+    COMMAND $<TARGET_FILE:gcrodr_matrix_test.exe> "-b" "cpu" "-c"
+            "${matrix_case}" "-d" "${test_data_dir}/data"
+  )
+  set_tests_properties(gcrodr_cpu_${matrix_case}_test
+                       PROPERTIES LABELS "gcrodr;cpu"
+  )
+
+  if(RESOLVE_USE_CUDA)
+    add_test(
+      NAME gcrodr_cuda_${matrix_case}_test
+      COMMAND $<TARGET_FILE:gcrodr_matrix_test.exe> "-b" "cuda" "-c"
+              "${matrix_case}" "-d" "${test_data_dir}/data"
+    )
+    set_tests_properties(
+      gcrodr_cuda_${matrix_case}_test
+      PROPERTIES LABELS "gcrodr;cuda" SKIP_RETURN_CODE 77
+    )
+  endif()
+endforeach()
 
 if(RESOLVE_USE_LUSOL)
   add_test(NAME lusol_test COMMAND $<TARGET_FILE:lusol_test.exe>
@@ -128,6 +155,10 @@ add_test(NAME sys_rand_fwht_fgmres_mgspm_test
 add_test(NAME sys_fgmres_cgs2_test
          COMMAND $<TARGET_FILE:sys_rand_gmres_test.exe> "-i" "fgmres" "-g"
                  "cgs2"
+)
+add_test(NAME sys_fgmres_cgs1_test
+         COMMAND $<TARGET_FILE:sys_rand_gmres_test.exe> "-i" "fgmres" "-g"
+                 "cgs1"
 )
 add_test(NAME sys_fgmres_mgs_test COMMAND $<TARGET_FILE:sys_rand_gmres_test.exe>
                                           "-i" "fgmres" "-g" "mgs"

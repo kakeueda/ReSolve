@@ -24,6 +24,8 @@ int main(int, char**)
     result += test.gemv(5000, 10);
     result += test.axpyMulti(100, 10);
     result += test.massDot(100, 10);
+    result += test.gemmTranspose(100, 10, 7);
+    result += test.gemmNoTranspose(100, 10, 7);
     result += test.scale(100);
     result += test.diagSolve(100);
     result += test.max(100);
@@ -49,6 +51,8 @@ int main(int, char**)
     result += test.axpyMulti(1000, 30);
     result += test.massDot(100, 10);
     result += test.massDot(1000, 30);
+    result += test.gemmTranspose(1000, 30, 17);
+    result += test.gemmNoTranspose(1000, 30, 17);
     result += test.amax(1000);
     result += test.scale(1000);
     result += test.diagSolve(1000);
@@ -76,6 +80,8 @@ int main(int, char**)
     result += test.axpyMulti(1000, 300);
     result += test.massDot(100, 10);
     result += test.massDot(1000, 30);
+    result += test.gemmTranspose(1000, 30, 17);
+    result += test.gemmNoTranspose(1000, 30, 17);
     result += test.amax(1000);
     result += test.scale(1000);
     result += test.diagSolve(1000);

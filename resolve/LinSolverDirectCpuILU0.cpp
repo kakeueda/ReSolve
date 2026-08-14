@@ -293,8 +293,9 @@ namespace ReSolve
     real_type*  valsU = U_->getValues(HOST);
 
     // Backward substitution
-    for (index_type i = N - 1; i >= 0; --i)
+    for (index_type reverse = N; reverse > 0; --reverse)
     {
+      const index_type i = reverse - 1;
       for (index_type j = rowsU[i] + 1; j < rowsU[i + 1]; ++j)
       {
         rhs[i] -= valsU[j] * rhs[colsU[j]];
@@ -343,8 +344,9 @@ namespace ReSolve
     const real_type*  valsU = U_->getValues(HOST);
 
     // Backward substitution
-    for (index_type i = N - 1; i >= 0; --i)
+    for (index_type reverse = N; reverse > 0; --reverse)
     {
+      const index_type i = reverse - 1;
       for (index_type j = rowsU[i] + 1; j < rowsU[i + 1]; ++j)
       {
         x[i] -= valsU[j] * x[colsU[j]];

@@ -295,6 +295,72 @@ namespace ReSolve
   }
 
   /**
+   * @brief Dense matrix-matrix product with an optionally transposed V.
+   */
+  void VectorHandlerCpu::gemm(char            transpose,
+                              index_type      size,
+                              vector::Vector* V,
+                              index_type      k,
+                              vector::Vector* A,
+                              index_type      q,
+                              vector::Vector* res)
+  {
+    const real_type* V_data   = V->getData(memory::HOST);
+    const real_type* A_data   = A->getData(memory::HOST);
+    real_type*       res_data = res->getData(memory::HOST);
+
+    switch (transpose)
+    {
+    case 'T':
+      for (index_type column = 0; column < q; ++column)
+      {
+        for (index_type row = 0; row < k; ++row)
+        {
+          real_type sum        = 0.0;
+          real_type correction = 0.0;
+          for (index_type i = 0; i < size; ++i)
+          {
+            const real_type product =
+                V_data[static_cast<std::size_t>(row) * size + i]
+                    * A_data[static_cast<std::size_t>(column) * size + i]
+                - correction;
+            const real_type updated = sum + product;
+            correction              = (updated - sum) - product;
+            sum                     = updated;
+          }
+          res_data[static_cast<std::size_t>(column) * k + row] = sum;
+        }
+      }
+      break;
+    case 'N':
+      for (index_type column = 0; column < q; ++column)
+      {
+        for (index_type row = 0; row < size; ++row)
+        {
+          real_type sum        = 0.0;
+          real_type correction = 0.0;
+          for (index_type j = 0; j < k; ++j)
+          {
+            const real_type product =
+                V_data[static_cast<std::size_t>(j) * size + row]
+                    * A_data[static_cast<std::size_t>(column) * k + j]
+                - correction;
+            const real_type updated = sum + product;
+            correction              = (updated - sum) - product;
+            sum                     = updated;
+          }
+          res_data[static_cast<std::size_t>(column) * size + row] = sum;
+        }
+      }
+      break;
+    default:
+      out::error() << "Unrecognized transpose option " << transpose
+                   << " in gemm. Valid options are 'N' and 'T'.\n";
+    }
+    res->setDataUpdated(memory::HOST);
+  }
+
+  /**
    * @brief Scale a vector by a diagonal matrix
    *
    * @param[in] diag Diagonal vector

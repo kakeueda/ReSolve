@@ -318,6 +318,72 @@ namespace ReSolve
   }
 
   /**
+   * @brief Dense matrix-matrix product with an optionally transposed V.
+   */
+  void VectorHandlerHip::gemm(char            transpose,
+                              index_type      size,
+                              vector::Vector* V,
+                              index_type      k,
+                              vector::Vector* A,
+                              index_type      q,
+                              vector::Vector* res)
+  {
+    using namespace constants;
+    rocblas_handle       handle_rocblas = workspace_->getRocblasHandle();
+    rocblas_operation    operation;
+    index_type           rows;
+    index_type           inner;
+    index_type           leading_A;
+    index_type           leading_B;
+    index_type           leading_result;
+    switch (transpose)
+    {
+    case 'T':
+      operation      = rocblas_operation_transpose;
+      rows           = k;
+      inner          = size;
+      leading_A      = size;
+      leading_B      = size;
+      leading_result = k;
+      break;
+    case 'N':
+      operation      = rocblas_operation_none;
+      rows           = size;
+      inner          = k;
+      leading_A      = size;
+      leading_B      = k;
+      leading_result = size;
+      break;
+    default:
+      out::error() << "Unrecognized transpose option " << transpose
+                   << " in gemm. Valid options are 'N' and 'T'.\n";
+      return;
+    }
+
+    const rocblas_status status         = rocblas_dgemm(handle_rocblas,
+                                                operation,
+                                                rocblas_operation_none,
+                                                rows,
+                                                q,
+                                                inner,
+                                                &ONE,
+                                                V->getData(memory::DEVICE),
+                                                leading_A,
+                                                A->getData(memory::DEVICE),
+                                                leading_B,
+                                                &ZERO,
+                                                res->getData(memory::DEVICE),
+                                                leading_result);
+    if (status != rocblas_status_success)
+    {
+      out::error() << "Dense matrix-matrix product failed with error code "
+                   << status << "\n";
+    }
+    res->setDataUpdated(memory::DEVICE);
+    mem_.deviceSynchronize();
+  }
+
+  /**
    * @brief Scale a vector by a diagonal matrix in HIP
    *
    * @param[in]  diag - vector representing the diagonal matrix

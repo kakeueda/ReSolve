@@ -43,6 +43,7 @@ ReSolve::tests::TestingResults runTests()
   result += test.orthogonalize(5000, ReSolve::GramSchmidt::MGS_TWO_SYNC);
   result += test.orthogonalize(5000, ReSolve::GramSchmidt::MGS_PM);
   result += test.orthogonalize(5000, ReSolve::GramSchmidt::CGS1);
+  result += test.arnoldiRelation(257, ReSolve::GramSchmidt::CGS1);
 
   return result;
 }

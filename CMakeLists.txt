@@ -197,6 +197,10 @@ else()
   message(STATUS "Not using CUDA cuDSS")
 endif()
 
+# GCRO-DR uses host LAPACK for small dense QR factorizations, triangular
+# solves, and generalized eigenvalue problems.
+find_package(LAPACK REQUIRED)
+
 # The binary dir is already a global include directory
 configure_file(
   ${CMAKE_SOURCE_DIR}/resolve/resolve_defs.hpp.in

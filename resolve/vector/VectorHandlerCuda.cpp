@@ -317,6 +317,71 @@ namespace ReSolve
   }
 
   /**
+   * @brief Dense matrix-matrix product with an optionally transposed V.
+   */
+  void VectorHandlerCuda::gemm(char            transpose,
+                               index_type      size,
+                               vector::Vector* V,
+                               index_type      k,
+                               vector::Vector* A,
+                               index_type      q,
+                               vector::Vector* res)
+  {
+    using namespace constants;
+    cublasHandle_t handle_cublas = workspace_->getCublasHandle();
+    cublasOperation_t operation;
+    index_type        rows;
+    index_type        inner;
+    index_type        leading_A;
+    index_type        leading_B;
+    index_type        leading_result;
+    switch (transpose)
+    {
+    case 'T':
+      operation      = CUBLAS_OP_T;
+      rows           = k;
+      inner          = size;
+      leading_A      = size;
+      leading_B      = size;
+      leading_result = k;
+      break;
+    case 'N':
+      operation      = CUBLAS_OP_N;
+      rows           = size;
+      inner          = k;
+      leading_A      = size;
+      leading_B      = k;
+      leading_result = size;
+      break;
+    default:
+      out::error() << "Unrecognized transpose option " << transpose
+                   << " in gemm. Valid options are 'N' and 'T'.\n";
+      return;
+    }
+
+    const cublasStatus_t status  = cublasDgemm(handle_cublas,
+                                              operation,
+                                              CUBLAS_OP_N,
+                                              rows,
+                                              q,
+                                              inner,
+                                              &ONE,
+                                              V->getData(memory::DEVICE),
+                                              leading_A,
+                                              A->getData(memory::DEVICE),
+                                              leading_B,
+                                              &ZERO,
+                                              res->getData(memory::DEVICE),
+                                              leading_result);
+    if (status != CUBLAS_STATUS_SUCCESS)
+    {
+      out::error() << "Dense matrix-matrix product failed with error code "
+                   << status << "\n";
+    }
+    res->setDataUpdated(memory::DEVICE);
+  }
+
+  /**
    * @brief Scale a vector by a diagonal matrix in CUDA
    *
    * @param[in]  diag - vector representing the diagonal matrix

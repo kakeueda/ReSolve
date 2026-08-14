@@ -22,6 +22,7 @@ int main()
 
   // Run tests
   result += test.paramSetGet();
+  result += test.gcrodrParamAndSetup();
 
   // Return tests summary
   return result.summary();

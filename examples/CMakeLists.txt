@@ -14,6 +14,10 @@ target_link_libraries(randGmres.exe PRIVATE ReSolve)
 add_executable(sysGmres.exe sysGmres.cpp)
 target_link_libraries(sysGmres.exe PRIVATE ReSolve)
 
+# Build the GCRO-DR recycle-space performance comparison.
+add_executable(gcrodrReuseBenchmark.exe gcrodrReuseBenchmark.cpp)
+target_link_libraries(gcrodrReuseBenchmark.exe PRIVATE ReSolve)
+
 if(RESOLVE_USE_KLU)
 
   # Build example with KLU factorization on CPU
@@ -55,7 +59,9 @@ endif(RESOLVE_USE_KLU)
 set(installable_executables "")
 
 # Install all examples in bin directory
-list(APPEND installable_executables randGmres.exe sysGmres.exe)
+list(APPEND installable_executables randGmres.exe sysGmres.exe
+     gcrodrReuseBenchmark.exe
+)
 
 if(RESOLVE_USE_KLU)
   list(APPEND installable_executables kluFactor.exe kluRefactor.exe

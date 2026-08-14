@@ -208,6 +208,111 @@ namespace ReSolve
         return status.report(__func__);
       }
 
+      TestOutcome gemmTranspose(index_type N, index_type K, index_type Q)
+      {
+        TestStatus status;
+
+        vector::Vector V(N, K);
+        vector::Vector X(N, Q);
+        vector::Vector result(K, Q);
+        V.allocate(memspace_);
+        X.allocate(memspace_);
+        result.allocate(memspace_);
+
+        for (index_type column = 0; column < K; ++column)
+        {
+          V.setToConst(column,
+                       static_cast<real_type>(column + 1),
+                       memspace_);
+        }
+        for (index_type column = 0; column < Q; ++column)
+        {
+          X.setToConst(column,
+                       -static_cast<real_type>(column + 1),
+                       memspace_);
+        }
+
+        handler_.gemm('T', N, &V, K, &X, Q, &result, memspace_);
+        if (memspace_ == memory::DEVICE)
+        {
+          result.syncData(memory::HOST);
+        }
+        for (index_type column = 0; column < Q; ++column)
+        {
+          for (index_type row = 0; row < K; ++row)
+          {
+            const real_type expected =
+                -static_cast<real_type>(N)
+                * static_cast<real_type>(row + 1)
+                * static_cast<real_type>(column + 1);
+            const real_type actual =
+                result.getData(memory::HOST)[static_cast<std::size_t>(column) * K
+                                             + static_cast<std::size_t>(row)];
+            if (!isEqual(actual, expected))
+            {
+              std::cout << "gemm transpose result (" << row << ", " << column
+                        << ") = " << actual << ", expected " << expected
+                        << "\n";
+              status *= false;
+            }
+          }
+        }
+        return status.report(__func__);
+      }
+
+      TestOutcome gemmNoTranspose(index_type N, index_type K, index_type Q)
+      {
+        TestStatus status;
+
+        vector::Vector V(N, K);
+        vector::Vector A(K, Q);
+        vector::Vector result(N, Q);
+        V.allocate(memspace_);
+        A.allocate(memspace_);
+        result.allocate(memspace_);
+
+        for (index_type column = 0; column < K; ++column)
+        {
+          V.setToConst(column,
+                       static_cast<real_type>(column + 1),
+                       memspace_);
+        }
+        for (index_type column = 0; column < Q; ++column)
+        {
+          A.setToConst(column,
+                       -static_cast<real_type>(column + 1),
+                       memspace_);
+        }
+
+        handler_.gemm('N', N, &V, K, &A, Q, &result, memspace_);
+        if (memspace_ == memory::DEVICE)
+        {
+          result.syncData(memory::HOST);
+        }
+        const real_type column_sum =
+            static_cast<real_type>(K) * static_cast<real_type>(K + 1)
+            / static_cast<real_type>(2);
+        for (index_type column = 0; column < Q; ++column)
+        {
+          const real_type expected =
+              -static_cast<real_type>(column + 1) * column_sum;
+          for (index_type row = 0; row < N; ++row)
+          {
+            const real_type actual =
+                result.getData(memory::HOST)[static_cast<std::size_t>(column) * N
+                                             + static_cast<std::size_t>(row)];
+            if (!isEqual(actual, expected))
+            {
+              std::cout << "gemm no-transpose result (" << row << ", " << column
+                        << ") = " << actual << ", expected " << expected
+                        << "\n";
+              status *= false;
+            }
+          }
+        }
+        return status.report(__func__);
+      }
+
       TestOutcome gemv(index_type N, index_type K)
       {
         TestStatus status;

@@ -326,6 +326,58 @@ namespace ReSolve
   }
 
   /**
+   * @brief Dense matrix-matrix product with an optionally transposed V.
+   *
+   * Computes res = V A for transpose = 'N', where V is size-by-k and A is
+   * k-by-q. Computes res = V^T A for transpose = 'T', where A is size-by-q.
+   *
+   * @param[in] transpose Whether to transpose V ('N' or 'T')
+   * @param[in] size      Number of rows in the non-transposed V
+   * @param[in] V         Column-major size-by-k multivector
+   * @param[in] k         Number of columns from V
+   * @param[in] A         Right-hand dense matrix
+   * @param[in] q         Number of columns in A and res
+   * @param[out] res      Column-major product
+   * @param[in] memspace  Memory space where the operation is performed
+   */
+  void VectorHandler::gemm(char                transpose,
+                           index_type          size,
+                           vector::Vector*     V,
+                           index_type          k,
+                           vector::Vector*     A,
+                           index_type          q,
+                           vector::Vector*     res,
+                           memory::MemorySpace memspace)
+  {
+    assert(size > 0 && k > 0 && q > 0);
+    assert(V != nullptr && A != nullptr && res != nullptr);
+    assert(V->getSize() == size && V->getNumVectors() >= k);
+    assert((transpose == 'N' || transpose == 'T')
+           && "gemm: transpose must be 'N' or 'T'.");
+    if (transpose == 'N')
+    {
+      assert(A->getSize() == k && res->getSize() == size);
+    }
+    else
+    {
+      assert(A->getSize() == size && res->getSize() == k);
+    }
+    assert(A->getNumVectors() >= q && res->getNumVectors() >= q);
+
+    using namespace ReSolve::memory;
+    switch (memspace)
+    {
+    case HOST:
+      cpuImpl_->gemm(transpose, size, V, k, A, q, res);
+      break;
+    case DEVICE:
+      devImpl_->gemm(transpose, size, V, k, A, q, res);
+      break;
+    }
+    res->setDataUpdated(memspace);
+  }
+
+  /**
    * @brief Scale a vector by a diagonal matrix
    *
    * @param[in] diag - vector representing the diagonal matrix

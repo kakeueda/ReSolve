@@ -61,6 +61,17 @@ namespace ReSolve
                    vector::Vector*     res,
                    memory::MemorySpace memspace);
 
+    // Dense matrix-matrix product. Computes res = V A for transpose = 'N'
+    // and res = V^T A for transpose = 'T'.
+    void gemm(char                transpose,
+              index_type          size,
+              vector::Vector*     V,
+              index_type          k,
+              vector::Vector*     A,
+              index_type          q,
+              vector::Vector*     res,
+              memory::MemorySpace memspace);
+
     // Dense matrix-vector product.
     void gemv(char                transpose,
               index_type          k, // number of vectors from multivector V to use

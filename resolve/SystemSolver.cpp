@@ -4,6 +4,7 @@
 #include <resolve/GramSchmidt.hpp>
 #include <resolve/LinSolverDirectCpuILU0.hpp>
 #include <resolve/LinSolverIterativeFGMRES.hpp>
+#include <resolve/LinSolverIterativeGCRODR.hpp>
 #include <resolve/PreconditionerLU.hpp>
 #include <resolve/matrix/Csc.hpp>
 #include <resolve/matrix/Csr.hpp>
@@ -44,6 +45,14 @@ namespace ReSolve
   // Create a shortcut name for Logger static class
   using out = io::Logger;
 
+  namespace
+  {
+    bool isIterativeSolveMethod(const std::string& method)
+    {
+      return method == "randgmres" || method == "fgmres" || method == "gcrodr";
+    }
+  } // namespace
+
   SystemSolver::SystemSolver(LinAlgWorkspaceCpu* workspaceCpu,
                              std::string         factor,
                              std::string         refactor,
@@ -66,7 +75,7 @@ namespace ReSolve
       precondition_method_   = "none";
     }
 
-    if ((solve == "randgmres" || solve == "fgmres") && (ir != "none"))
+    if (isIterativeSolveMethod(solve) && (ir != "none"))
     {
       out::warning() << "Incorrect input: "
                      << "Iterative refinement cannot be enabled together with an iterative solve method.\n"
@@ -106,7 +115,7 @@ namespace ReSolve
       precondition_method_   = "none";
     }
 
-    if ((solve == "randgmres" || solve == "fgmres") && (ir != "none"))
+    if (isIterativeSolveMethod(solve) && (ir != "none"))
     {
       out::warning() << "Incorrect input: "
                      << "Iterative refinement cannot be enabled together with an iterative solve method.\n"
@@ -147,7 +156,7 @@ namespace ReSolve
       precondition_method_   = "none";
     }
 
-    if ((solve == "randgmres" || solve == "fgmres") && (ir != "none"))
+    if (isIterativeSolveMethod(solve) && (ir != "none"))
     {
       out::warning() << "Incorrect input: "
                      << "Iterative refinement cannot be enabled together with an iterative solve method.\n"
@@ -182,7 +191,7 @@ namespace ReSolve
       delete refactorizationSolver_;
     }
 
-    if (solveMethod_ == "randgmres" || solveMethod_ == "fgmres")
+    if (isIterativeSolveMethod(solveMethod_))
     {
       delete iterativeSolver_;
     }
@@ -227,15 +236,14 @@ namespace ReSolve
     }
 
     // If we use iterative solver, we can set it up here
-    if (solveMethod_ == "randgmres")
+    if (isIterativeSolveMethod(solveMethod_))
     {
-      auto* rgmres = dynamic_cast<LinSolverIterativeRandFGMRES*>(iterativeSolver_);
-      status += rgmres->setup(A_);
-    }
-    else if (solveMethod_ == "fgmres")
-    {
-      auto* fgmres = dynamic_cast<LinSolverIterativeFGMRES*>(iterativeSolver_);
-      status += fgmres->setup(A_);
+      if (iterativeSolver_ == nullptr)
+      {
+        out::error() << "Iterative solver not initialized!\n";
+        return 1;
+      }
+      status += iterativeSolver_->setup(A_);
     }
     else
     {
@@ -420,6 +428,13 @@ namespace ReSolve
                                                       vectorHandler_,
                                                       gs_);
     }
+    else if (solveMethod_ == "gcrodr")
+    {
+      setGramSchmidtMethod(gsMethod_);
+      iterativeSolver_ = new LinSolverIterativeGCRODR(matrixHandler_,
+                                                      vectorHandler_,
+                                                      gs_);
+    }
     else
     {
       // do nothing
@@ -573,14 +588,23 @@ namespace ReSolve
    */
   int SystemSolver::solve(vector_type* rhs, vector_type* x)
   {
+    // A GCRO-DR solve can reuse the current operator image when neither the
+    // matrix nor its preconditioner was explicitly reset.
+    if (solveMethod_ == "gcrodr")
+    {
+      return iterativeSolver_->solve(rhs, x);
+    }
+
     int status = 0;
 
-    // Use Krylov solver if selected
     if (solveMethod_ == "randgmres" || solveMethod_ == "fgmres")
     {
-      status += iterativeSolver_->resetMatrix(A_);
-      status += iterativeSolver_->solve(rhs, x);
-      return status;
+      status = iterativeSolver_->resetMatrix(A_);
+      if (status != 0)
+      {
+        return status;
+      }
+      return iterativeSolver_->solve(rhs, x);
     }
 
     if (solveMethod_ == "klu")
@@ -642,6 +666,12 @@ namespace ReSolve
       return status;
     }
 
+    if (solveMethod_ == "gcrodr" && side != "right")
+    {
+      out::error() << "GCRO-DR requires right preconditioning.\n";
+      return 1;
+    }
+
     Preconditioner::Side prec_side;
     if (side == "left")
     {
@@ -691,6 +721,14 @@ namespace ReSolve
     }
 
     status += preconditioner_->reset(A);
+    if (status == 0 && solveMethod_ == "gcrodr")
+    {
+      // resetPreconditioner() is the explicit notification that the
+      // preconditioned operator changed.  Keeping this out of solve() lets
+      // recycling methods retain a valid operator image across solves with
+      // the same matrix and preconditioner.
+      status += iterativeSolver_->resetMatrix(A_);
+    }
 
     return status;
   }
@@ -831,6 +869,13 @@ namespace ReSolve
                                                       vectorHandler_,
                                                       gs_);
     }
+    else if (solveMethod_ == "gcrodr")
+    {
+      setGramSchmidtMethod(gsMethod_);
+      iterativeSolver_ = new LinSolverIterativeGCRODR(matrixHandler_,
+                                                      vectorHandler_,
+                                                      gs_);
+    }
     else
     {
       out::error() << "Solve method " << solveMethod_
@@ -867,10 +912,10 @@ namespace ReSolve
     if (method == "none")
       return;
 
-    if (solveMethod_ == "randgmres" || solveMethod_ == "fgmres")
+    if (isIterativeSolveMethod(solveMethod_))
     {
       out::warning() << "Iterative refinement cannot be enabled together with an "
-                     << "iterative solve method ('randgmres' or 'fgmres'). "
+                     << "iterative solve method ('randgmres', 'fgmres', or 'gcrodr'). "
                      << "Keeping refinement method 'none'.\n";
       return;
     }

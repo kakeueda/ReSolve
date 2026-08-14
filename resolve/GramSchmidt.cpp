@@ -1,9 +1,11 @@
 #include "GramSchmidt.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
 
+#include <resolve/Profiling.hpp>
 #include <resolve/utilities/logger/Logger.hpp>
 #include <resolve/vector/Vector.hpp>
 
@@ -145,6 +147,7 @@ namespace ReSolve
   int GramSchmidt::orthogonalize(index_type n, vector::Vector* V, real_type* H, index_type i)
   {
     using namespace constants;
+    RESOLVE_PROFILE_SCOPE("GramSchmidt.orthogonalize");
 
     double     t    = 0.0;
     double     s    = 0.0;
@@ -175,7 +178,9 @@ namespace ReSolve
       }
       else
       {
-        assert(0 && "Gram-Schmidt failed, vector with ZERO norm\n");
+        // A zero next vector is a valid happy breakdown for Arnoldi-based
+        // solvers. Return it to the caller so it can distinguish convergence
+        // from an orthogonalization failure.
         return 1;
       }
       return 0;
@@ -189,27 +194,55 @@ namespace ReSolve
 
       // Hcol = V(:,1:i)^T*V(:,i+1), then V(:,i+1) = V(:, i+1) - V(:,1:i)*Hcol
       vector_handler_->gemv('T', i + 1, ONE, ZERO, V, vec_v_, vec_Hcolumn_aux_, memspace_);
-      vector_handler_->gemv('N', i + 1, ONE, MINUS_ONE, V, vec_Hcolumn_aux_, vec_v_, memspace_);
+      vector_handler_->gemv('N', i + 1, MINUS_ONE, ONE, V, vec_Hcolumn_aux_, vec_v_, memspace_);
 
       // Second CGS orthogonalization
 
       // Hcol = V(:,1:i)^T*V(:,i+1), then V(:,i+1) = V(:, i+1) - V(:,1:i)*Hcol
       vector_handler_->gemv('T', i + 1, ONE, ZERO, V, vec_v_, vec_Hcolumn_, memspace_);
-      vector_handler_->gemv('N', i + 1, ONE, MINUS_ONE, V, vec_Hcolumn_, vec_v_, memspace_);
+      vector_handler_->gemv('N', i + 1, MINUS_ONE, ONE, V, vec_Hcolumn_, vec_v_, memspace_);
 
       // Accumulate the coefficients from both CGS steps
       vector_handler_->axpy(ONE, vec_Hcolumn_aux_, vec_Hcolumn_, memspace_);
 
-      // copy H_col to H
       if (memspace_ == memory::DEVICE)
       {
-        vec_Hcolumn_->syncData(memory::HOST);
-      }
-      vec_Hcolumn_->copyToExternal(&H[idxmap(i, 0, num_vecs_ + 1)], 0, memory::HOST, memory::HOST);
+        // Keep the norm reduction on the device and append it to the
+        // coefficient buffer.  Copying [h; w^T w] to the host in one batch
+        // removes one device synchronization from every Arnoldi step.
+        vector_type squared_norm(1);
+        squared_norm.setData(vec_Hcolumn_->getData(memory::DEVICE) + i + 1, memory::DEVICE);
+        vector_handler_->gemv('T',
+                              1,
+                              ONE,
+                              ZERO,
+                              vec_v_,
+                              vec_v_,
+                              &squared_norm,
+                              memory::DEVICE);
+        vec_Hcolumn_->resize(i + 2);
+        vec_Hcolumn_->setDataUpdated(memory::DEVICE);
+        vec_Hcolumn_->copyToExternal(
+            &H[idxmap(i, 0, num_vecs_ + 1)],
+            0,
+            memory::DEVICE,
+            memory::HOST);
 
-      t = vector_handler_->dot(vec_v_, vec_v_, memspace_);
+        t = std::sqrt(std::max(ZERO, H[idxmap(i, i + 1, num_vecs_ + 1)]));
+      }
+      else
+      {
+        // copy H_col to H
+        vec_Hcolumn_->copyToExternal(
+            &H[idxmap(i, 0, num_vecs_ + 1)],
+            0,
+            memory::HOST,
+            memory::HOST);
+        t = vector_handler_->dot(vec_v_, vec_v_, memspace_);
+        t = std::sqrt(std::max(ZERO, static_cast<real_type>(t)));
+      }
+
       // set the last entry in Hessenberg matrix
-      t                                  = std::sqrt(t);
       H[idxmap(i, i + 1, num_vecs_ + 1)] = t;
 
       if (std::abs(t) > MACHINE_EPSILON)
@@ -219,7 +252,7 @@ namespace ReSolve
       }
       else
       {
-        assert(0 && "Gram-Schmidt failed, vector with ZERO norm\n");
+        // Let Arnoldi-based callers handle a happy breakdown.
         return 1;
       }
       return 0;
@@ -276,7 +309,7 @@ namespace ReSolve
       }
       else
       {
-        assert(0 && "Iterative refinement failed, Krylov vector with ZERO norm\n");
+        // Let Arnoldi-based callers handle a happy breakdown.
         return 1;
       }
       h_rv = nullptr;
@@ -361,7 +394,7 @@ namespace ReSolve
       }
       else
       {
-        assert(0 && "Iterative refinement failed, Krylov vector with ZERO norm\n");
+        // Let Arnoldi-based callers handle a happy breakdown.
         return 1;
       }
       h_rv = nullptr;
@@ -374,7 +407,7 @@ namespace ReSolve
       // Hcol = V(:,1:i)^T*V(:,i+1);
       vector_handler_->gemv('T', i + 1, ONE, ZERO, V, vec_v_, vec_Hcolumn_, memspace_);
       // V(:,i+1) = V(:, i+1) -  V(:,1:i)*Hcol
-      vector_handler_->gemv('N', i + 1, ONE, MINUS_ONE, V, vec_Hcolumn_, vec_v_, memspace_);
+      vector_handler_->gemv('N', i + 1, MINUS_ONE, ONE, V, vec_Hcolumn_, vec_v_, memspace_);
 
       // copy H_col to H
       vec_Hcolumn_->setDataUpdated(memspace_);
@@ -396,7 +429,7 @@ namespace ReSolve
       }
       else
       {
-        assert(0 && "Gram-Schmidt failed, vector with ZERO norm\n");
+        // Let Arnoldi-based callers handle a happy breakdown.
         return 1;
       }
       return 0;

@@ -42,6 +42,16 @@ namespace ReSolve
     // Size = n
     virtual void dot2Multi(index_type size, vector::Vector* V, index_type k, vector::Vector* x, vector::Vector* res) = 0;
 
+    // Dense matrix-matrix product. Computes res = V A for transpose = 'N'
+    // and res = V^T A for transpose = 'T', with V size-by-k.
+    virtual void gemm(char            transpose,
+                      index_type      size,
+                      vector::Vector* V,
+                      index_type      k,
+                      vector::Vector* A,
+                      index_type      q,
+                      vector::Vector* res) = 0;
+
     // Scale a vector by a diagonal matrix
     virtual void scal(vector::Vector* diag, vector::Vector* vec)                    = 0;
     virtual void scal(vector::Vector* diag, vector::Vector* vec, index_type offset) = 0;

@@ -16,8 +16,10 @@ set(ReSolve_SRC
     LinSolverIterative.cpp
     GramSchmidt.cpp
     LinSolverIterativeFGMRES.cpp
+    LinSolverIterativeGCRODR.cpp
     LinSolverDirectCpuILU0.cpp
     LinSolverIterativeRandFGMRES.cpp
+    SmallDenseLinearAlgebra.cpp
     SystemSolver.cpp
     Preconditioner.cpp
     PreconditionerLU.cpp
@@ -50,7 +52,9 @@ set(ReSolve_HEADER_INSTALL
     LinSolverDirect.hpp
     LinSolverIterative.hpp
     LinSolverIterativeFGMRES.hpp
+    LinSolverIterativeGCRODR.hpp
     LinSolverDirectCpuILU0.hpp
+    SmallDenseLinearAlgebra.hpp
     SystemSolver.hpp
     GramSchmidt.hpp
     MemoryUtils.hpp
@@ -181,7 +185,7 @@ target_include_directories(
 )
 
 target_link_libraries(ReSolve PUBLIC ${ReSolve_Targets_List})
-target_link_libraries(ReSolve PRIVATE ${ReSolve_Object_List})
+target_link_libraries(ReSolve PRIVATE ${ReSolve_Object_List} LAPACK::LAPACK)
 
 if(RESOLVE_USE_PROFILING)
   if(NOT RESOLVE_USE_GPU)

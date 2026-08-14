@@ -42,6 +42,14 @@ namespace ReSolve
     // Size = n
     virtual void dot2Multi(index_type size, vector::Vector* V, index_type k, vector::Vector* x, vector::Vector* res);
 
+    virtual void gemm(char            transpose,
+                      index_type      size,
+                      vector::Vector* V,
+                      index_type      k,
+                      vector::Vector* A,
+                      index_type      q,
+                      vector::Vector* res);
+
     /** gemv:
      * if `transpose = N` (no), `x = beta*x +  alpha*V*y`,
      * where `x` is `[n x 1]`, `V` is `[n x k]` and `y` is `[k x 1]`.

@@ -62,7 +62,6 @@ namespace ReSolve
           break;
         case GramSchmidt::CGS1:
           testname += " (Classical Gram-Schmidt)";
-          status.expectFailure();
           break;
         case GramSchmidt::CGS2:
           testname += " (Reorthogonalized Classical Gram-Schmidt)";
@@ -141,6 +140,74 @@ namespace ReSolve
         delete[] H;
 
         return status.report(testname.c_str());
+      }
+
+      TestOutcome arnoldiRelation(index_type N, GramSchmidt::GSVariant var)
+      {
+        TestStatus status;
+
+        const index_type restart = 1;
+        vector::Vector   V(N, restart + 1);
+        V.allocateAll(memspace_);
+
+        // Normalize the first Arnoldi basis vector.
+        V.setToConst(0, constants::ONE, memspace_);
+        real_type norm = handler_.dot(&V, &V, memspace_);
+        handler_.scal(constants::ONE / std::sqrt(norm), &V, memspace_);
+
+        // Store a nontrivial candidate w in V(:,1) and retain it so the
+        // Arnoldi relation w = h(0,0) v_0 + h(1,0) v_1 can be checked.
+        std::vector<real_type> candidate(static_cast<std::size_t>(N));
+        real_type*             working = V.getData(1, memory::HOST);
+        for (index_type row = 0; row < N; ++row)
+        {
+          const real_type value =
+              static_cast<real_type>(row % 7) - static_cast<real_type>(3)
+              + static_cast<real_type>(0.125 * (row % 3));
+          candidate[static_cast<std::size_t>(row)] = value;
+          working[row]                             = value;
+        }
+        V.setDataUpdated(1, memory::HOST);
+        if (memspace_ == memory::DEVICE)
+        {
+          V.syncData(1, memory::DEVICE);
+        }
+
+        GramSchmidt GS(&handler_, var);
+        GS.setup(N, restart);
+        real_type H[2] = {constants::ZERO, constants::ZERO};
+        status *= (GS.orthogonalize(N, &V, H, 0) == 0);
+
+        std::vector<real_type> v0(static_cast<std::size_t>(N));
+        std::vector<real_type> v1(static_cast<std::size_t>(N));
+        status *= (V.copyToExternal(v0.data(), 0, memspace_, memory::HOST) == 0);
+        status *= (V.copyToExternal(v1.data(), 1, memspace_, memory::HOST) == 0);
+        real_type        error_squared     = constants::ZERO;
+        real_type        candidate_squared = constants::ZERO;
+        for (index_type row = 0; row < N; ++row)
+        {
+          const real_type reconstructed =
+              H[0] * v0[static_cast<std::size_t>(row)]
+              + H[1] * v1[static_cast<std::size_t>(row)];
+          const real_type difference =
+              candidate[static_cast<std::size_t>(row)] - reconstructed;
+          error_squared += difference * difference;
+          candidate_squared += candidate[static_cast<std::size_t>(row)]
+                               * candidate[static_cast<std::size_t>(row)];
+        }
+        const real_type relative_error =
+            std::sqrt(error_squared / candidate_squared);
+        const real_type tolerance =
+            static_cast<real_type>(100 * N)
+            * std::numeric_limits<real_type>::epsilon();
+        if (relative_error > tolerance)
+        {
+          std::cout << "Arnoldi relation relative error: " << relative_error
+                    << ", tolerance: " << tolerance << "\n";
+          status *= false;
+        }
+
+        return status.report(__func__);
       }
 
     private:
